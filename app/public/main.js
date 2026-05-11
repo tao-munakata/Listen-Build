@@ -1,17 +1,23 @@
 const CATEGORIES = [
   ["inbox", "Inbox"],
+  ["today", "今日"],
   ["idea", "アイデア"],
   ["requirement", "要件"],
   ["design", "設計"],
   ["bug", "バグ"],
   ["feature", "機能追加"],
   ["version", "Ver管理"],
+  ["scrum", "Scrum"],
   ["docs", "設計書"],
   ["changelog", "変更履歴"],
   ["search", "検索"],
   ["git", "Git"],
   ["audit", "監査"]
 ];
+
+const WINDOW_CATEGORIES = CATEGORIES.filter(([key]) =>
+  ["idea", "requirement", "design", "bug", "feature", "version"].includes(key)
+);
 
 let state = {
   projects: [],
@@ -54,6 +60,12 @@ function projectEntries(category) {
   const project = currentProject();
   if (!project) return [];
   return state.entries.filter((entry) => entry.projectId === project.id && entry.category === category);
+}
+
+function projectAllEntries() {
+  const project = currentProject();
+  if (!project) return [];
+  return state.entries.filter((entry) => entry.projectId === project.id);
 }
 
 function projectInbox() {
@@ -119,6 +131,8 @@ function renderTabs() {
     const count =
       key === "inbox"
         ? projectInbox().filter((m) => m.processingStatus !== "done").length
+        : key === "today"
+          ? projectAllEntries().filter((entry) => entry.status === "in_progress").length
         : key === "audit"
           ? projectAuditLogs().length
           : projectEntries(key).length;
@@ -138,12 +152,100 @@ function renderContent() {
     return;
   }
   if (state.selectedTab === "inbox") return renderInbox();
+  if (state.selectedTab === "today") return renderToday();
+  if (state.selectedTab === "scrum") return renderScrum();
   if (state.selectedTab === "docs") return renderDocs();
   if (state.selectedTab === "changelog") return renderChangelog();
   if (state.selectedTab === "search") return renderSearch();
   if (state.selectedTab === "git") return renderGit();
   if (state.selectedTab === "audit") return renderAudit();
   renderEntries();
+}
+
+function renderToday() {
+  const entries = projectAllEntries();
+  const inbox = projectInbox().filter((message) => message.processingStatus !== "done");
+  const inProgress = entries
+    .filter((entry) => entry.status === "in_progress")
+    .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0));
+  const nextEntries = entries
+    .filter((entry) => entry.status === "open")
+    .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0))
+    .slice(0, 5);
+
+  $("content").innerHTML = `
+    <section class="row gitToolbar">
+      <div>
+        <h3>今日の作業</h3>
+        <p class="toolbarText">未処理、対応中、次にやる候補をまとめて確認します。</p>
+      </div>
+      <button id="todayRefreshButton">更新</button>
+    </section>
+    <article class="row">
+      <div class="stats">
+        <div class="stat"><strong>${inbox.length}</strong><span>未処理Inbox</span></div>
+        <div class="stat"><strong>${inProgress.length}</strong><span>対応中</span></div>
+        <div class="stat"><strong>${nextEntries.length}</strong><span>次候補</span></div>
+      </div>
+    </article>
+    ${todaySection("対応中", inProgress, "対応中の項目はありません。")}
+    ${todaySection("次にやる候補", nextEntries, "次候補はありません。")}
+    ${inbox.length ? `
+      <article class="row">
+        <div class="rowHeader">
+          <h3>未処理Inbox</h3>
+          <span class="pill warn">${inbox.length}</span>
+        </div>
+        <div class="body">Inboxに未処理の入力があります。AI整理で窓へ振り分けてください。</div>
+        <div class="actions entryActions">
+          <button data-open-tab="inbox">Inboxを開く</button>
+        </div>
+      </article>
+    ` : ""}
+  `;
+  $("todayRefreshButton").addEventListener("click", load);
+  document.querySelectorAll("[data-open-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedTab = button.dataset.openTab;
+      render();
+    });
+  });
+  bindEntryStatusButtons();
+}
+
+function todaySection(title, entries, emptyText) {
+  return `
+    <section class="contentBlock">
+      <h3 class="sectionTitle">${title}</h3>
+      ${
+        entries.length
+          ? entries.map((entry) => todayEntry(entry)).join("")
+          : `<article class="row"><div class="body">${emptyText}</div></article>`
+      }
+    </section>
+  `;
+}
+
+function todayEntry(entry) {
+  return `
+    <article class="row">
+      <div class="rowHeader">
+        <h3>${escapeHtml(entry.title)}</h3>
+        <span class="pill ${entry.status === "in_progress" ? "warn" : "good"}">${escapeHtml(entry.status)}</span>
+      </div>
+      <div class="meta">
+        <span class="pill">${escapeHtml(entry.category)}</span>
+        <span class="pill">priority ${entry.priority}</span>
+      </div>
+      <div class="body">${escapeHtml(entry.bodyMarkdown)}</div>
+      <div class="actions entryActions">
+        <button data-open-tab="${escapeHtml(entry.category)}">窓を開く</button>
+        ${entry.status === "in_progress" ? "" : `<button data-entry-status="${entry.id}" data-status="in_progress">対応中にする</button>`}
+        ${entry.status === "done" ? "" : `<button data-entry-status="${entry.id}" data-status="done">完了にする</button>`}
+        ${entry.status === "open" ? "" : `<button data-entry-status="${entry.id}" data-status="open">未着手に戻す</button>`}
+      </div>
+    </article>
+  `;
 }
 
 function renderInbox() {
@@ -269,7 +371,7 @@ function renderInbox() {
 }
 
 function routeButtons(id, suggested) {
-  return CATEGORIES.filter(([key]) => key !== "inbox")
+  return WINDOW_CATEGORIES
     .map(([key, label]) => `<button data-route="${id}" data-category="${key}">${key === suggested ? "推奨: " : ""}${label}</button>`)
     .join("");
 }
@@ -294,10 +396,16 @@ function renderEntries() {
             <span class="pill">${new Date(entry.createdAt).toLocaleString()}</span>
           </div>
           <div class="body">${escapeHtml(entry.bodyMarkdown)}</div>
+          <div class="actions entryActions">
+            ${entry.status === "in_progress" ? "" : `<button data-entry-status="${entry.id}" data-status="in_progress">対応中にする</button>`}
+            ${entry.status === "done" ? "" : `<button data-entry-status="${entry.id}" data-status="done">完了にする</button>`}
+            ${entry.status === "open" ? "" : `<button data-entry-status="${entry.id}" data-status="open">未着手に戻す</button>`}
+          </div>
         </article>
       `
     )
     .join("");
+  bindEntryStatusButtons();
 }
 
 function renderAudit() {
@@ -488,6 +596,141 @@ async function renderGit() {
     }
   });
   await loadGitStatus();
+}
+
+async function renderScrum() {
+  const project = currentProject();
+  if (!project) return;
+  $("content").innerHTML = `
+    <section class="row gitToolbar">
+      <div>
+        <h3>AI Scrum Master</h3>
+        <p class="toolbarText">未処理・高優先度・最近の変更から次アクションを提案します。</p>
+      </div>
+      <button id="refreshScrumButton">更新</button>
+    </section>
+    <section id="scrumContent" class="content"></section>
+  `;
+  $("refreshScrumButton").addEventListener("click", loadScrumPlan);
+  await loadScrumPlan();
+}
+
+async function loadScrumPlan() {
+  const project = currentProject();
+  if (!project) return;
+  const plan = await api(`/api/projects/${project.slug}/scrum/plan`);
+  renderScrumPlan(plan);
+}
+
+function renderScrumPlan(plan) {
+  $("scrumContent").innerHTML = `
+    <article class="row">
+      <div class="stats">
+        <div class="stat"><strong>${plan.summary.pendingInbox}</strong><span>未処理Inbox</span></div>
+        <div class="stat"><strong>${plan.summary.openEntries}</strong><span>Open窓</span></div>
+        <div class="stat"><strong>${plan.summary.highPriorityBugs}</strong><span>高優先バグ</span></div>
+        <div class="stat"><strong>${plan.summary.recentAudit}</strong><span>最近の監査</span></div>
+      </div>
+    </article>
+    ${plan.recommendations.map((item) => `
+      <article class="row">
+        <div class="rowHeader">
+          <h3>${escapeHtml(item.title)}</h3>
+          <span class="pill">P${item.priority}</span>
+        </div>
+        <div class="meta">
+          <span class="pill">${escapeHtml(item.type)}</span>
+        </div>
+        <div class="body"><strong>理由:</strong> ${escapeHtml(item.reason)}</div>
+        <div class="body"><strong>次アクション:</strong> ${escapeHtml(item.action)}</div>
+        <div class="actions scrumActions">
+          ${scrumActionButtons(item)}
+        </div>
+      </article>
+    `).join("")}
+  `;
+  bindScrumActionButtons();
+}
+
+function scrumActionButtons(item) {
+  const openButton = item.category
+    ? `<button data-open-tab="${escapeHtml(item.category)}">窓を開く</button>`
+    : "";
+  const startButton = item.startEntryId
+    ? `<button data-entry-status="${escapeHtml(item.startEntryId)}" data-status="in_progress">先頭を対応中にする</button>`
+    : "";
+  if (item.actionKey === "organize_inbox") {
+    return `${openButton}<button data-scrum-action="organize_inbox">AI整理を実行</button>`;
+  }
+  if (item.actionKey === "generate_docs") {
+    return `${openButton}<button data-scrum-action="generate_docs">設計書生成</button>`;
+  }
+  if (item.actionKey === "generate_changelog") {
+    return `${openButton}<button data-scrum-action="generate_changelog">CHANGELOG生成</button>`;
+  }
+  return `${openButton}${startButton}`;
+}
+
+function bindScrumActionButtons() {
+  document.querySelectorAll("[data-open-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedTab = button.dataset.openTab;
+      render();
+    });
+  });
+
+  document.querySelectorAll("[data-scrum-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const project = currentProject();
+      if (!project) return;
+      button.disabled = true;
+      const original = button.textContent;
+      button.textContent = "実行中...";
+      try {
+        if (button.dataset.scrumAction === "organize_inbox") {
+          await api(`/api/projects/${project.slug}/inbox/organize`, {
+            method: "POST",
+            body: JSON.stringify({ threshold: 0.8, limit: 10 })
+          });
+        }
+        if (button.dataset.scrumAction === "generate_docs") {
+          await api(`/api/projects/${project.slug}/docs/design`, { method: "POST" });
+        }
+        if (button.dataset.scrumAction === "generate_changelog") {
+          await api(`/api/projects/${project.slug}/changelog`, { method: "POST" });
+        }
+        await load();
+        state.selectedTab = "scrum";
+        render();
+      } catch (error) {
+        alert(`Scrumアクションに失敗しました: ${error.message}`);
+        button.disabled = false;
+        button.textContent = original;
+      }
+    });
+  });
+  bindEntryStatusButtons();
+}
+
+function bindEntryStatusButtons() {
+  document.querySelectorAll("[data-entry-status]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      const original = button.textContent;
+      button.textContent = "更新中...";
+      try {
+        await api(`/api/entries/${button.dataset.entryStatus}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: button.dataset.status })
+        });
+        await load();
+      } catch (error) {
+        alert(`ステータス更新に失敗しました: ${error.message}`);
+        button.disabled = false;
+        button.textContent = original;
+      }
+    });
+  });
 }
 
 async function loadGitStatus() {

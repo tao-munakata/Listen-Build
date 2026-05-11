@@ -148,6 +148,26 @@ POST /api/git/init
 POST /api/git/commit
 ```
 
+## AI Scrum Master
+
+Use the `Scrum` tab to inspect deterministic next-action recommendations and execute common actions:
+open the relevant window, mark an entry as `in_progress`, organize Inbox, and regenerate docs or changelog.
+
+## Daily Workflow
+
+Use the `今日` tab for the morning work view:
+
+- 未処理Inbox
+- 対応中
+- 次にやる候補
+
+API:
+
+```text
+GET /api/projects/{projectSlug}/scrum/plan
+PATCH /api/entries/{entryId}
+```
+
 ## Webhook
 
 Generic endpoint:

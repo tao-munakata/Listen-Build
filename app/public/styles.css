@@ -234,6 +234,17 @@ button {
   gap: 10px;
 }
 
+.contentBlock {
+  display: grid;
+  gap: 10px;
+}
+
+.sectionTitle {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 8px 2px 0;
+}
+
 .row {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -295,6 +306,11 @@ button {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.entryActions,
+.scrumActions {
+  margin-top: 12px;
 }
 
 .actions button {

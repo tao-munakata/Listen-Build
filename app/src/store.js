@@ -218,6 +218,40 @@ function listEntries(projectRef, category) {
   return store.entries.filter((entry) => entry.projectId === project.id && (!category || entry.category === category));
 }
 
+function updateEntry(entryId, input) {
+  const store = readJson();
+  const entry = store.entries.find((item) => item.id === entryId);
+  if (!entry) throw Object.assign(new Error("Entry not found"), { statusCode: 404 });
+  const project = findProject(store, entry.projectId);
+  if (!project) throw Object.assign(new Error("Project not found"), { statusCode: 404 });
+
+  const before = {
+    status: entry.status,
+    priority: entry.priority,
+    title: entry.title
+  };
+  if (input.status) entry.status = input.status;
+  if (input.priority !== undefined) entry.priority = Number(input.priority);
+  if (input.title) entry.title = input.title;
+  if (input.bodyMarkdown !== undefined || input.body !== undefined) {
+    entry.bodyMarkdown = input.bodyMarkdown !== undefined ? input.bodyMarkdown : input.body;
+  }
+  entry.updatedAt = now();
+  entry.markdownPath = writeEntryMarkdown(project, entry);
+  audit(store, "human", "entry.update", "entry", entry.id, {
+    projectId: project.id,
+    category: entry.category,
+    before,
+    after: {
+      status: entry.status,
+      priority: entry.priority,
+      title: entry.title
+    }
+  });
+  writeJson(store);
+  return entry;
+}
+
 function createInbox(projectRef, input) {
   const store = readJson();
   const project = findProject(store, projectRef || input.project || input.projectId);
@@ -604,6 +638,147 @@ function readDesignDoc(projectRef) {
   };
 }
 
+function generateScrumPlan(projectRef) {
+  const store = readJson();
+  const project = findProject(store, projectRef);
+  if (!project) throw Object.assign(new Error("Project not found"), { statusCode: 404 });
+
+  const inbox = store.inbox.filter((message) => message.projectId === project.id);
+  const entries = store.entries.filter((entry) => entry.projectId === project.id);
+  const openEntries = entries.filter((entry) => entry.status !== "done" && entry.status !== "rejected");
+  const pendingInbox = inbox.filter((message) => message.processingStatus !== "done");
+  const recentAudit = listAuditLogs(project.id, { limit: 8 });
+  const recommendations = [];
+
+  if (pendingInbox.length) {
+    recommendations.push({
+      priority: 10,
+      type: "inbox",
+      category: "inbox",
+      title: `未処理Inboxを整理する (${pendingInbox.length}件)`,
+      reason: "未処理の入力が残っているため、窓に反映されず知識が滞留しています。",
+      action: "InboxタブでAI整理を実行し、低信頼のものだけ人間が確認する。",
+      relatedEntryIds: [],
+      actionKey: "organize_inbox"
+    });
+  }
+
+  const highPriorityBugs = openEntries
+    .filter((entry) => entry.category === "bug")
+    .filter((entry) => Number(entry.priority || 0) >= 7);
+  for (const bug of highPriorityBugs.slice(0, 3)) {
+    recommendations.push({
+      priority: 9,
+      type: "bug",
+      category: "bug",
+      title: bug.title,
+      reason: `priority ${bug.priority} のバグが未完了です。`,
+      action: "再現手順、原因、修正方針を追記して対応ステータスを更新する。",
+      relatedEntryIds: [bug.id],
+      startEntryId: bug.status === "open" ? bug.id : null,
+      actionKey: "start_entry"
+    });
+  }
+
+  const openRequirements = openEntries.filter((entry) => entry.category === "requirement");
+  if (openRequirements.length) {
+    recommendations.push({
+      priority: 8,
+      type: "requirement",
+      category: "requirement",
+      title: `要件を実装タスクへ分解する (${openRequirements.length}件)`,
+      reason: "要件窓にopen項目があり、設計・実装タスクへ落とし込めます。",
+      action: "要件ごとに受け入れ条件と対応する設計項目を追加する。",
+      relatedEntryIds: openRequirements.map((entry) => entry.id),
+      startEntryId: openRequirements.find((entry) => entry.status === "open")?.id || null,
+      actionKey: "start_entry"
+    });
+  }
+
+  const openDesigns = openEntries.filter((entry) => entry.category === "design");
+  if (openDesigns.length) {
+    recommendations.push({
+      priority: 7,
+      type: "design",
+      category: "design",
+      title: `設計項目を具体化する (${openDesigns.length}件)`,
+      reason: "設計窓にopen項目があり、API/DB/UIなどの具体化が必要です。",
+      action: "設計書タブで設計書を生成し、不足しているAPI・DB・UI項目を補う。",
+      relatedEntryIds: openDesigns.map((entry) => entry.id),
+      startEntryId: openDesigns.find((entry) => entry.status === "open")?.id || null,
+      actionKey: "start_entry"
+    });
+  }
+
+  const openFeatures = openEntries.filter((entry) => entry.category === "feature");
+  if (openFeatures.length) {
+    recommendations.push({
+      priority: 6,
+      type: "feature",
+      category: "feature",
+      title: `機能追加候補を優先順位付けする (${openFeatures.length}件)`,
+      reason: "機能追加窓にopen項目があり、実装順の判断が必要です。",
+      action: "影響範囲と工数を追記し、次スプリント候補を決める。",
+      relatedEntryIds: openFeatures.map((entry) => entry.id),
+      startEntryId: openFeatures.find((entry) => entry.status === "open")?.id || null,
+      actionKey: "start_entry"
+    });
+  }
+
+  const docsGenerated = recentAudit.some((log) => log.action === "docs.generate");
+  const changelogGenerated = recentAudit.some((log) => log.action === "changelog.generate");
+  if (!docsGenerated && entries.length) {
+    recommendations.push({
+      priority: 5,
+      type: "docs",
+      category: "docs",
+      title: "設計書を最新化する",
+      reason: "最近の活動内で設計書生成が確認できません。",
+      action: "設計書タブでdocs/設計書.mdを生成する。",
+      relatedEntryIds: [],
+      actionKey: "generate_docs"
+    });
+  }
+  if (!changelogGenerated && entries.length) {
+    recommendations.push({
+      priority: 4,
+      type: "changelog",
+      category: "changelog",
+      title: "CHANGELOGを更新する",
+      reason: "最近の活動内でCHANGELOG生成が確認できません。",
+      action: "変更履歴タブでCHANGELOG.mdを生成する。",
+      relatedEntryIds: [],
+      actionKey: "generate_changelog"
+    });
+  }
+
+  if (!recommendations.length) {
+    recommendations.push({
+      priority: 1,
+      type: "steady",
+      category: "git",
+      title: "現状維持: 目立つ未処理はありません",
+      reason: "未処理Inboxや高優先度の未完了項目は見つかりませんでした。",
+      action: "次のAIメモ投入、またはGitタブでスナップショットを確認する。",
+      relatedEntryIds: [],
+      actionKey: "open_git"
+    });
+  }
+
+  return {
+    projectId: project.id,
+    generatedAt: now(),
+    summary: {
+      pendingInbox: pendingInbox.length,
+      openEntries: openEntries.length,
+      highPriorityBugs: highPriorityBugs.length,
+      recentAudit: recentAudit.length
+    },
+    recommendations: recommendations.sort((a, b) => b.priority - a.priority).slice(0, 10),
+    recentAudit
+  };
+}
+
 function appendEntrySection(lines, entries, emptyText) {
   if (!entries.length) {
     lines.push(emptyText, "");
@@ -649,6 +824,7 @@ module.exports = {
   listProjects,
   createEntry,
   listEntries,
+  updateEntry,
   createInbox,
   listInbox,
   updateInboxClassification,
@@ -661,6 +837,7 @@ module.exports = {
   readChangelog,
   generateDesignDoc,
   readDesignDoc,
+  generateScrumPlan,
   overview,
   slugify
 };

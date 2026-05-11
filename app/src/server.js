@@ -11,6 +11,7 @@ const {
   listProjects,
   createEntry,
   listEntries,
+  updateEntry,
   createInbox,
   listInbox,
   updateInboxClassification,
@@ -23,6 +24,7 @@ const {
   readChangelog,
   generateDesignDoc,
   readDesignDoc,
+  generateScrumPlan,
   overview,
   classifyText
 } = require("./store");
@@ -136,6 +138,11 @@ async function handleApi(req, res, url) {
     return sendJson(res, 201, createEntry(params.projectRef, await readBody(req)));
   }
 
+  params = routeParams(pathname, "/api/entries/:id");
+  if (params && req.method === "PATCH") {
+    return sendJson(res, 200, updateEntry(params.id, await readBody(req)));
+  }
+
   params = routeParams(pathname, "/api/projects/:projectRef/audit");
   if (params && req.method === "GET") {
     return sendJson(res, 200, listAuditLogs(params.projectRef, { limit: searchParams.get("limit") || 100 }));
@@ -165,6 +172,11 @@ async function handleApi(req, res, url) {
 
   if (params && req.method === "POST") {
     return sendJson(res, 200, generateDesignDoc(params.projectRef));
+  }
+
+  params = routeParams(pathname, "/api/projects/:projectRef/scrum/plan");
+  if (params && req.method === "GET") {
+    return sendJson(res, 200, generateScrumPlan(params.projectRef));
   }
 
   if (req.method === "GET" && pathname === "/api/inbox") {
