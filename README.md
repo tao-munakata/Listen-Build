@@ -1,4 +1,8 @@
-# AI Development OS
+# Listen-Build
+
+課題を聞いて、その場でアプリを作成し提供する。
+
+## AI Development OS
 
 Local-first MVP for the AI開発OS concept.
 
