@@ -1,0 +1,14 @@
+{
+  "name": "ai-development-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first AI Development OS MVP",
+  "scripts": {
+    "dev": "node app/src/server.js",
+    "start": "node app/src/server.js",
+    "check": "node app/src/smoke-test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Development OS</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="mark">AI</div>
+          <div>
+            <h1>AI開発OS</h1>
+            <p>Local MVP</p>
+          </div>
+        </div>
+        <button class="primary" id="newProjectButton">案件を作成</button>
+        <div class="projectList" id="projectList"></div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Project Window</p>
+            <h2 id="projectTitle">案件を選択してください</h2>
+          </div>
+          <div class="stats" id="stats"></div>
+        </header>
+
+        <section class="composer">
+          <select id="sourceAi">
+            <option value="chatgpt">ChatGPT</option>
+            <option value="claude">Claude</option>
+            <option value="codex">Codex</option>
+            <option value="gemini">Gemini</option>
+            <option value="notebooklm">NotebookLM</option>
+            <option value="other">Other</option>
+          </select>
+          <textarea id="inboxText" placeholder="AI出力、バグメモ、要件、設計メモをここに投入"></textarea>
+          <button id="saveInboxButton">Inboxへ保存</button>
+          <button id="geminiGenerateButton">Gemini API</button>
+        </section>
+
+        <nav class="tabs" id="tabs"></nav>
+        <section class="content" id="content"></section>
+      </main>
+    </div>
+
+    <dialog id="projectDialog">
+      <form method="dialog" class="dialogForm">
+        <h3>新規案件</h3>
+        <label>案件名<input id="projectName" required /></label>
+        <label>概要<textarea id="projectDescription"></textarea></label>
+        <menu>
+          <button value="cancel">キャンセル</button>
+          <button id="createProjectButton" value="default">作成</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="/main.js"></script>
+  </body>
+</html>

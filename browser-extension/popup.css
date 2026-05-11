@@ -1,0 +1,53 @@
+body {
+  width: 360px;
+  margin: 0;
+  font-family: Arial, "Hiragino Sans", "Yu Gothic", sans-serif;
+  color: #20252b;
+  background: #f6f7f9;
+}
+
+main {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 16px;
+}
+
+label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+  color: #66717f;
+}
+
+input,
+select,
+textarea,
+button {
+  border: 1px solid #d8dee6;
+  border-radius: 8px;
+  padding: 9px;
+  font: inherit;
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+button {
+  border: 0;
+  background: #176b87;
+  color: white;
+  font-weight: 700;
+}
+
+#status {
+  min-height: 18px;
+  margin: 0;
+  color: #66717f;
+}

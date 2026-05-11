@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "AI Development OS Capture",
+  "version": "0.1.0",
+  "description": "Send selected text or notes to AI Development OS Inbox.",
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": ["http://localhost:3000/*"],
+  "action": {
+    "default_title": "AI開発OSへ送る",
+    "default_popup": "popup.html"
+  }
+}

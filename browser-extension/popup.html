@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <h1>AI開発OSへ送る</h1>
+      <label>Project slug<input id="project" placeholder="aios-demo" /></label>
+      <label>Source
+        <select id="sourceAi">
+          <option value="gemini">Gemini</option>
+          <option value="chatgpt">ChatGPT</option>
+          <option value="claude">Claude</option>
+          <option value="codex">Codex</option>
+          <option value="browser">Browser</option>
+        </select>
+      </label>
+      <label>Webhook token<input id="token" type="password" /></label>
+      <label>Memo<textarea id="memo"></textarea></label>
+      <button id="send">Inboxへ送る</button>
+      <p id="status"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
