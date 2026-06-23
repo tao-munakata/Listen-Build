@@ -97,18 +97,25 @@ button {
   gap: 8px;
 }
 
+.projectRow {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.projectRow.active .projectItem {
+  border-color: #49a078;
+  background: rgba(73, 160, 120, 0.22);
+}
+
 .projectItem {
+  flex: 1;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
   color: white;
   text-align: left;
   border-radius: 8px;
   padding: 10px;
-}
-
-.projectItem.active {
-  border-color: #49a078;
-  background: rgba(73, 160, 120, 0.22);
 }
 
 .projectItem strong,
@@ -120,6 +127,24 @@ button {
   color: #b7c1cc;
   font-size: 12px;
   margin-top: 3px;
+}
+
+.projectDeleteButton {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #b7c1cc;
+  border-radius: 6px;
+  padding: 0 8px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.projectDeleteButton:hover {
+  background: rgba(179, 64, 64, 0.3);
+  border-color: #b34040;
+  color: #ffaaaa;
 }
 
 .main {
@@ -491,6 +516,61 @@ dialog {
   gap: 8px;
   margin: 0;
   padding: 0;
+}
+
+.dueOverdue {
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.dueSoon {
+  background: #fef3c7;
+  color: #92400e;
+  font-weight: 600;
+}
+
+.dueOk {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.ownerPill {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.overdueStat strong {
+  color: #dc2626;
+}
+
+.entryInlineEdit {
+  display: flex;
+  gap: 12px;
+  padding: 6px 0 2px;
+  flex-wrap: wrap;
+}
+
+.entryInlineEdit label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.entryInlineEdit input[type="date"],
+.entryInlineEdit input[type="text"] {
+  font-size: 13px;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.entryInlineEdit input[type="text"] {
+  width: 140px;
 }
 
 @media (max-width: 860px) {

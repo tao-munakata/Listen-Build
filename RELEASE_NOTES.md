@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.3.0 - 2026-06-23
+
+- Added due date and owner fields to entries.
+- Sprint board view in Today tab: overdue / in-progress / next columns, sorted by due date.
+- Inline date picker and owner input on every entry card (auto-saves on change).
+- Added project delete button in sidebar (removes project, entries, and inbox).
+
 ## v0.2.0 - 2026-05-12
 
 - Added Gemini API integration and model auto-discovery.

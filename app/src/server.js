@@ -8,6 +8,7 @@ const {
   DATA_FILE,
   VAULT_ROOT,
   createProject,
+  deleteProject,
   listProjects,
   createEntry,
   listEntries,
@@ -129,7 +130,12 @@ async function handleApi(req, res, url) {
     return sendJson(res, 201, createProject(await readBody(req)));
   }
 
-  let params = routeParams(pathname, "/api/projects/:projectRef/entries");
+  let params = routeParams(pathname, "/api/projects/:projectRef");
+  if (params && req.method === "DELETE") {
+    return sendJson(res, 200, deleteProject(params.projectRef));
+  }
+
+  params = routeParams(pathname, "/api/projects/:projectRef/entries");
   if (params && req.method === "GET") {
     return sendJson(res, 200, listEntries(params.projectRef, searchParams.get("category")));
   }

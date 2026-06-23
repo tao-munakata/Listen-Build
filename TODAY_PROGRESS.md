@@ -87,6 +87,6 @@ was updated from `open` to `in_progress`.
 
 ## Next Candidate Step
 
-Next recommended step:
-
-- Add due dates and owners to entries so the daily workflow can become a real sprint board.
+- Drag-and-drop between sprint columns (期限切れ / 対応中 / 次候補)
+- Milestone / sprint view: group entries by due-date week
+- Owner filter: show only entries assigned to a specific person

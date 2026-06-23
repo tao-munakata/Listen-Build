@@ -142,6 +142,8 @@ function writeEntryMarkdown(project, entry) {
       priority: entry.priority,
       source: entry.source,
       source_inbox_id: entry.sourceInboxId || "",
+      due_date: entry.dueDate || "",
+      owner: entry.owner || "",
       created_at: entry.createdAt,
       updated_at: entry.updatedAt
     })}# ${entry.title}\n\n${entry.bodyMarkdown}\n`
@@ -180,6 +182,19 @@ function createProject(input) {
   return project;
 }
 
+function deleteProject(projectRef) {
+  const store = readJson();
+  const idx = store.projects.findIndex((p) => p.id === projectRef || p.slug === projectRef);
+  if (idx === -1) throw Object.assign(new Error("Project not found"), { statusCode: 404 });
+  const project = store.projects[idx];
+  store.projects.splice(idx, 1);
+  store.entries = store.entries.filter((e) => e.projectId !== project.id);
+  store.inbox = store.inbox.filter((m) => m.projectId !== project.id);
+  audit(store, "human", "project.delete", "project", project.id, { slug: project.slug });
+  writeJson(store);
+  return { ok: true, slug: project.slug };
+}
+
 function findProject(store, projectRef) {
   return store.projects.find((project) => project.id === projectRef || project.slug === projectRef);
 }
@@ -200,6 +215,8 @@ function createEntry(projectRef, input) {
     status: input.status || "open",
     source: input.source || "human",
     sourceInboxId: input.sourceInboxId || null,
+    dueDate: input.dueDate || "",
+    owner: input.owner || "",
     markdownPath: "",
     createdAt,
     updatedAt: createdAt
@@ -236,6 +253,8 @@ function updateEntry(entryId, input) {
   if (input.bodyMarkdown !== undefined || input.body !== undefined) {
     entry.bodyMarkdown = input.bodyMarkdown !== undefined ? input.bodyMarkdown : input.body;
   }
+  if (input.dueDate !== undefined) entry.dueDate = input.dueDate;
+  if (input.owner !== undefined) entry.owner = input.owner;
   entry.updatedAt = now();
   entry.markdownPath = writeEntryMarkdown(project, entry);
   audit(store, "human", "entry.update", "entry", entry.id, {
@@ -821,6 +840,7 @@ module.exports = {
   WINDOW_DIRS,
   classifyText,
   createProject,
+  deleteProject,
   listProjects,
   createEntry,
   listEntries,

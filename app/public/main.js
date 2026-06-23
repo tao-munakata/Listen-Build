@@ -97,10 +97,13 @@ function renderProjects() {
   $("projectList").innerHTML = state.projects
     .map(
       (project) => `
-        <button class="projectItem ${project.id === state.selectedProject ? "active" : ""}" data-project="${project.id}">
-          <strong>${escapeHtml(project.name)}</strong>
-          <span>${escapeHtml(project.slug)}</span>
-        </button>
+        <div class="projectRow ${project.id === state.selectedProject ? "active" : ""}">
+          <button class="projectItem" data-project="${project.id}">
+            <strong>${escapeHtml(project.name)}</strong>
+            <span>${escapeHtml(project.slug)}</span>
+          </button>
+          <button class="projectDeleteButton" data-delete-project="${project.id}" data-project-name="${escapeHtml(project.name)}" title="削除">×</button>
+        </div>
       `
     )
     .join("");
@@ -110,6 +113,18 @@ function renderProjects() {
       state.selectedProject = button.dataset.project;
       state.selectedTab = "inbox";
       render();
+    });
+  });
+
+  document.querySelectorAll("[data-delete-project]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const name = button.dataset.projectName;
+      if (!confirm(`「${name}」を削除しますか？\nエントリーとInboxもすべて削除されます。`)) return;
+      const projectId = button.dataset.deleteProject;
+      await api(`/api/projects/${projectId}`, { method: "DELETE" });
+      if (state.selectedProject === projectId) state.selectedProject = null;
+      await load();
     });
   });
 }
@@ -165,29 +180,46 @@ function renderContent() {
 function renderToday() {
   const entries = projectAllEntries();
   const inbox = projectInbox().filter((message) => message.processingStatus !== "done");
+  const today = new Date().toISOString().slice(0, 10);
+
+  const overdue = entries
+    .filter((entry) => entry.status !== "done" && entry.dueDate && entry.dueDate < today)
+    .sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1));
   const inProgress = entries
-    .filter((entry) => entry.status === "in_progress")
-    .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0));
+    .filter((entry) => entry.status === "in_progress" && !(entry.dueDate && entry.dueDate < today))
+    .sort((a, b) => {
+      if (a.dueDate && b.dueDate) return a.dueDate < b.dueDate ? -1 : 1;
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return Number(b.priority || 0) - Number(a.priority || 0);
+    });
   const nextEntries = entries
-    .filter((entry) => entry.status === "open")
-    .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0))
+    .filter((entry) => entry.status === "open" && !(entry.dueDate && entry.dueDate < today))
+    .sort((a, b) => {
+      if (a.dueDate && b.dueDate) return a.dueDate < b.dueDate ? -1 : 1;
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return Number(b.priority || 0) - Number(a.priority || 0);
+    })
     .slice(0, 5);
 
   $("content").innerHTML = `
     <section class="row gitToolbar">
       <div>
-        <h3>今日の作業</h3>
-        <p class="toolbarText">未処理、対応中、次にやる候補をまとめて確認します。</p>
+        <h3>スプリントボード</h3>
+        <p class="toolbarText">期限・担当者付きで進捗を管理します。カードの期限・担当欄は直接編集できます。</p>
       </div>
       <button id="todayRefreshButton">更新</button>
     </section>
     <article class="row">
       <div class="stats">
         <div class="stat"><strong>${inbox.length}</strong><span>未処理Inbox</span></div>
+        <div class="stat overdueStat"><strong>${overdue.length}</strong><span>期限切れ</span></div>
         <div class="stat"><strong>${inProgress.length}</strong><span>対応中</span></div>
         <div class="stat"><strong>${nextEntries.length}</strong><span>次候補</span></div>
       </div>
     </article>
+    ${overdue.length ? todaySection("⚠ 期限切れ", overdue, "") : ""}
     ${todaySection("対応中", inProgress, "対応中の項目はありません。")}
     ${todaySection("次にやる候補", nextEntries, "次候補はありません。")}
     ${inbox.length ? `
@@ -211,6 +243,7 @@ function renderToday() {
     });
   });
   bindEntryStatusButtons();
+  bindInlineEdit();
 }
 
 function todaySection(title, entries, emptyText) {
@@ -226,9 +259,18 @@ function todaySection(title, entries, emptyText) {
   `;
 }
 
+function dueBadge(dueDate) {
+  if (!dueDate) return "";
+  const today = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const cls = dueDate < today ? "dueOverdue" : dueDate <= tomorrow ? "dueSoon" : "dueOk";
+  const label = dueDate < today ? `期限切れ ${dueDate}` : `期限 ${dueDate}`;
+  return `<span class="pill ${cls}">${escapeHtml(label)}</span>`;
+}
+
 function todayEntry(entry) {
   return `
-    <article class="row">
+    <article class="row" data-entry-id="${entry.id}">
       <div class="rowHeader">
         <h3>${escapeHtml(entry.title)}</h3>
         <span class="pill ${entry.status === "in_progress" ? "warn" : "good"}">${escapeHtml(entry.status)}</span>
@@ -236,6 +278,12 @@ function todayEntry(entry) {
       <div class="meta">
         <span class="pill">${escapeHtml(entry.category)}</span>
         <span class="pill">priority ${entry.priority}</span>
+        ${dueBadge(entry.dueDate)}
+        ${entry.owner ? `<span class="pill ownerPill">👤 ${escapeHtml(entry.owner)}</span>` : ""}
+      </div>
+      <div class="entryInlineEdit">
+        <label>期限<input type="date" class="inlineDueDate" data-entry-id="${entry.id}" value="${escapeHtml(entry.dueDate || "")}" /></label>
+        <label>担当<input type="text" class="inlineOwner" data-entry-id="${entry.id}" placeholder="担当者名" value="${escapeHtml(entry.owner || "")}" /></label>
       </div>
       <div class="body">${escapeHtml(entry.bodyMarkdown)}</div>
       <div class="actions entryActions">
@@ -385,7 +433,7 @@ function renderEntries() {
   $("content").innerHTML = items
     .map(
       (entry) => `
-        <article class="row">
+        <article class="row" data-entry-id="${entry.id}">
           <div class="rowHeader">
             <h3>${escapeHtml(entry.title)}</h3>
             <span class="pill good">${escapeHtml(entry.status)}</span>
@@ -393,7 +441,13 @@ function renderEntries() {
           <div class="meta">
             <span class="pill">priority ${entry.priority}</span>
             <span class="pill">${escapeHtml(entry.source)}</span>
+            ${dueBadge(entry.dueDate)}
+            ${entry.owner ? `<span class="pill ownerPill">👤 ${escapeHtml(entry.owner)}</span>` : ""}
             <span class="pill">${new Date(entry.createdAt).toLocaleString()}</span>
+          </div>
+          <div class="entryInlineEdit">
+            <label>期限<input type="date" class="inlineDueDate" data-entry-id="${entry.id}" value="${escapeHtml(entry.dueDate || "")}" /></label>
+            <label>担当<input type="text" class="inlineOwner" data-entry-id="${entry.id}" placeholder="担当者名" value="${escapeHtml(entry.owner || "")}" /></label>
           </div>
           <div class="body">${escapeHtml(entry.bodyMarkdown)}</div>
           <div class="actions entryActions">
@@ -406,6 +460,7 @@ function renderEntries() {
     )
     .join("");
   bindEntryStatusButtons();
+  bindInlineEdit();
 }
 
 function renderAudit() {
@@ -773,6 +828,31 @@ function auditSummary(log) {
   if (log.action === "inbox.route") return `窓へ振り分け: ${detail.category || "-"}`;
   if (log.action === "entry.create") return `窓エントリー作成: ${detail.category || "-"}`;
   return log.action;
+}
+
+function bindInlineEdit() {
+  document.querySelectorAll(".inlineDueDate").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const entryId = input.dataset.entryId;
+      await api(`/api/entries/${entryId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ dueDate: input.value })
+      });
+      const entry = state.entries.find((e) => e.id === entryId);
+      if (entry) entry.dueDate = input.value;
+    });
+  });
+  document.querySelectorAll(".inlineOwner").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const entryId = input.dataset.entryId;
+      await api(`/api/entries/${entryId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ owner: input.value })
+      });
+      const entry = state.entries.find((e) => e.id === entryId);
+      if (entry) entry.owner = input.value;
+    });
+  });
 }
 
 function escapeHtml(value) {
